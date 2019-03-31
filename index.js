@@ -5,7 +5,7 @@ const Gobang = {
   cx: null, // canvas 位置
   cy: null, // canvas 位置
   board: [], // 棋盘列表
-  isFirst: true, // 是否先手
+  isFirst: false, // 是否先手
   playStack: [], // 玩家下棋栈
   pcStack: [], // 电脑下棋栈
   step: 0, // 步数
@@ -37,62 +37,97 @@ const Gobang = {
       }
     }
     if (!this.isFirst) {
+      this.step++;
       this.board[7][7].piece = '#000';
     }
     this.draw();
   },
   getWins() { // 获取所有赢法
     const wins = [];
+    const winMap = {};
     for (let i = 0; i < 15; i++) {
       wins[i] = [];
       for (let j = 0; j < 15; j++) {
         wins[i][j] = [];
       }
     }
-    // 竖线赢法
-    for (let i = 0; i < 15; i++) {
-      for (let j = 0; j < 11; j++) {
-        for (let k = 0; k < 5; k++) {
-          wins[i][j + k][this.count] = true;
-        }
-        this.count++;
-      }
-    }
 
     // 横线赢法
     for (let i = 0; i < 15; i++) {
       for (let j = 0; j < 11; j++) {
+        const steps = [];
         for (let k = 0; k < 5; k++) {
           wins[j + k][i][this.count] = true;
+          steps.push(`${j + k},${i}`);
         }
+        winMap[this.count] = {
+          steps,
+          position: 1, // 1: 水平方向
+        };
         this.count++;
       }
     }
 
-    //正斜线赢法
+    // 竖线赢法
+    for (let i = 0; i < 15; i++) {
+      for (let j = 0; j < 11; j++) {
+        const steps = [];
+        for (let k = 0; k < 5; k++) {
+          wins[i][j + k][this.count] = true;
+          steps.push(`${i},${j + k}`);
+        }
+        winMap[this.count] = {
+          steps,
+          position: 2, // 2: 垂直方向
+        };
+        this.count++;
+      }
+    }
+
+    // 正斜线赢法
     for (let i = 0; i < 11; i++) {
       for (let j = 0; j < 11; j++) {
+        const steps = [];
         for (let k = 0; k < 5; k++) {
           wins[i + k][j + k][this.count] = true;
+          steps.push(`${i + k},${j + k}`);
         }
+        winMap[this.count] = {
+          steps,
+          position: 3, // 3: 正斜线方向
+        };
         this.count++;
       }
     }
 
-    //反斜线赢法
+    // 反斜线赢法
     for (let i = 0; i < 11; i++) {
       for (let j = 14; j > 3; j--) {
+        const steps = [];
         for (let k = 0; k < 5; k++) {
           wins[i + k][j - k][this.count] = true;
+          steps.push(`${i + k},${j - k}`);
         }
+        winMap[this.count] = {
+          steps,
+          position: 4, // 4: 反斜线方向
+        };
         this.count++;
       }
     }
     this.wins = wins;
 
     for (let i = 0; i < this.count; i++) {
-      this.playerWins[i] = 0;
-      this.pcWins[i] = 0;
+      this.playerWins[i] = {
+        number: 0,
+        steps: winMap[i].steps,
+        position: winMap[i].position,
+      };
+      this.pcWins[i] = {
+        number: 0,
+        steps: winMap[i].steps,
+        position: winMap[i].position,
+      };;
     }
   },
   draw() { // 画图
@@ -148,9 +183,9 @@ const Gobang = {
         this.draw();
         for (let k = 0; k < this.count; k++) {
           if (this.wins[xi][yi][k]) { // 查找是否有这种赢法
-            this.playerWins[k]++; // 该赢法加1子
-            this.pcWins[k] = 10; // 玩家占了1子，电脑在该赢法上不可能获胜
-            if (this.playerWins[k] === 5) {
+            this.playerWins[k].number++; // 该赢法加1子
+            this.pcWins[k].number = 10; // 玩家占了1子，电脑在该赢法上不可能获胜
+            if (this.playerWins[k].number === 5) {
               alert('恭喜，你赢了！');
               this.isOver = true;
             }
@@ -161,9 +196,11 @@ const Gobang = {
           this.pcPlaying();
         }
       }
-    })
+    });
+    document.getElementById('regret').addEventListener('click', this.regret.bind(this));
   },
   pcPlaying() { // 电脑回合
+    this.step++;
     const playScore = [];
     const pcScore = [];
     let max = 0;
@@ -179,36 +216,47 @@ const Gobang = {
     }
     for (let i = 0; i < 15; i++) {
       for (let j = 0; j < 15; j++) {
-
         // 遍历搜索棋盘上每个空位，查询每个空位的赢法
         if (!this.board[i][j].piece) {
           for (var k = 0; k < this.count; k++) {
             if (this.wins[i][j][k]) {
               // 判断每种玩家赢法上有多少子来判断权重
-              if (this.playerWins[k] === 1) {
+              if (this.playerWins[k].number === 1) {
                 playScore[i][j] += 200;
               }
-              if (this.playerWins[k] === 2) {
+              if (this.playerWins[k].number === 2) {
                 playScore[i][j] += 400;
               }
-              if (this.playerWins[k] === 3) {
-                playScore[i][j] += 2000;
+              if (this.playerWins[k].number === 3) {
+                if (this.checkWins(this.playerWins[k])) { // 检测3个子中是否已经被其他子侵占
+                  playScore[i][j] += 400;
+                } else {
+                  playScore[i][j] += 1000000;
+                }
               }
-              if (this.playerWins[k] === 4) {
-                playScore[i][j] += 10000;
+              if (this.playerWins[k].number === 4) {
+                playScore[i][j] += 100000000;
               }
               // 判断每种电脑赢法上有多少子来判断权重（进攻优于防守）
-              if (this.pcWins[k] === 1) {
+              if (this.pcWins[k].number === 1) {
                 pcScore[i][j] += 220;
               }
-              if (this.pcWins[k] === 2) {
-                pcScore[i][j] += 420;
+              if (this.pcWins[k].number === 2) {
+                if (this.checkWins(this.pcWins[k])) {
+                  pcScore[i][j] += 220;
+                } else {
+                  pcScore[i][j] += 10000;
+                }
               }
-              if (this.pcWins[k] === 3) {
-                pcScore[i][j] += 2100;
+              if (this.pcWins[k].number === 3) {
+                if (this.checkWins(this.pcWins[k])) {
+                  pcScore[i][j] += 100000;
+                } else {
+                  pcScore[i][j] += 10000000;
+                }
               }
-              if (this.pcWins[k] === 4) {
-                pcScore[i][j] += 20000;
+              if (this.pcWins[k].number === 4) {
+                pcScore[i][j] += 1000000000;
               }
             }
           }
@@ -240,16 +288,14 @@ const Gobang = {
     }
 
     // 最终遍历出权重最高的 u,v 点
-    console.log(u, v);
     this.board[u][v].piece = this.isFirst ? '#F5F5F5' : '#000';
-    this.step++;
     this.draw();
     this.pcStack.push(`${u},${v}`);
     for (let k = 0; k < this.count; k++) {
       if (this.wins[u][v][k]) {
-        this.pcWins[k]++;
-        this.playerWins[k] = 10; //这个位置对方不可能赢了
-        if (this.pcWins[k] === 5) {
+        this.pcWins[k].number++;
+        this.playerWins[k].number = 10; //这个位置对方不可能赢了
+        if (this.pcWins[k].number === 5) {
           alert('计算机赢了');
           this.isOver = true;
         }
@@ -258,6 +304,71 @@ const Gobang = {
     if (!this.isOver) {
       this.isPlay = true;
     }
+  },
+  checkWins(win) { // 检查某个赢法是否被堵死
+    const first = win.steps[0]; // 第一子
+    const firstX = Number(first.split(',')[0]);
+    const firstY = Number(first.split(',')[1]);
+    const last = win.steps[4]; // 最后一子
+    const lastX = Number(last.split(',')[0]);
+    const lastY = Number(last.split(',')[1]);
+    const piece = this.isFirst ? '#F5F5F5' : '#000';
+    if (win.position === 1) { // 横线
+      if (firstX - 1 < 0) { // 出界
+        return false;
+      }
+      if (lastX + 1 > 14) { // 出界
+        return false;
+      }
+      if (this.board[firstX - 1][firstY].piece === piece || this.board[lastX + 1][lastY].piece === piece) {
+        return true;
+      }
+    }
+    if (win.position === 2) { // 竖线
+      if (firstY - 1 < 0) { // 出界
+        return false;
+      }
+      if (lastY + 1 > 14) { // 出界
+        return false;
+      }
+      if (this.board[firstX][firstY - 1].piece === piece || this.board[lastX][lastY + 1].piece === piece) {
+        return true;
+      }
+    }
+    if (win.position === 3) { // 正斜线
+      if ((firstX - 1 < 0) || (firstY - 1 < 0)) { // 出界
+        return false;
+      }
+      if ((lastX + 1 > 14) || (lastY + 1 > 14)) { // 出界
+        return false;
+      }
+      if (this.board[firstX - 1][firstY - 1].piece === piece || this.board[lastX + 1][lastY + 1].piece === piece) {
+        return true;
+      }
+    }
+    if (win.position === 4) { // 返斜线
+      if ((firstX - 1 < 0) || (firstY + 1 > 14)) { // 出界
+        return false;
+      }
+      if ((lastX + 1 > 14) || (lastY - 1 < 0)) { // 出界
+        return false;
+      }
+      if (this.board[firstX - 1][firstY + 1].piece === piece || this.board[lastX + 1][lastY - 1].piece === piece) {
+        return true;
+      }
+    }
+    return false;
+  },
+  regret() { // 悔棋
+    if (this.step < 7) {
+      return;
+    }
+    this.step -= 2;
+    const playerStep = this.playStack.pop();
+    const pcStep = this.pcStack.pop();
+    this.board[playerStep.split(',')[0]][playerStep.split(',')[1]].piece = false;
+    this.board[pcStep.split(',')[0]][pcStep.split(',')[1]].piece = false;
+    this.draw();
   },
 }
 
