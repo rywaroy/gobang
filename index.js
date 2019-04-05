@@ -1,3 +1,6 @@
+const WHITE = '#F5F5F5';
+const BLACK = "#000";
+
 const Gobang = {
   canvas: null,
   ctx: null,
@@ -5,7 +8,7 @@ const Gobang = {
   cx: null, // canvas 位置
   cy: null, // canvas 位置
   board: [], // 棋盘列表
-  isFirst: true, // 是否先手
+  isFirst: false, // 是否先手
   playStack: [], // 玩家下棋栈
   pcStack: [], // 电脑下棋栈
   step: 0, // 步数
@@ -33,12 +36,13 @@ const Gobang = {
           x: this.unit / 2 + i * this.unit,
           y: this.unit / 2 + j * this.unit,
           piece: false,
+          active: false,
         };
       }
     }
     if (!this.isFirst) {
       this.step++;
-      this.board[7][7].piece = '#000';
+      this.board[7][7].piece = BLACK;
       this.pcPlaying(7, 7);
     } else {
       this.draw();
@@ -164,6 +168,12 @@ const Gobang = {
     this.ctx.fillStyle = data.piece;
     this.ctx.arc(data.x, data.y, this.unit / 2, 0, 2 * Math.PI, false);
     this.ctx.fill();
+    if (data.active) {
+      this.ctx.beginPath();
+      this.ctx.fillStyle = 'red';
+      this.ctx.arc(data.x, data.y, this.unit / 6, 0, 2 * Math.PI, false);
+      this.ctx.fill();
+    }
     this.ctx.closePath();
   },
   bind() { // 绑定事件
@@ -179,7 +189,7 @@ const Gobang = {
       const xi = Math.round((x - this.cx - this.unit / 2) / this.unit);
       const yi = Math.round((y - this.cy - this.unit / 2) / this.unit);
       if (!this.board[xi][yi].piece) {
-        this.board[xi][yi].piece = this.isFirst ? '#000' : '#F5F5F5';
+        this.board[xi][yi].piece = this.isFirst ? BLACK : WHITE;
         this.playStack.push(`${xi},${yi}`); // 入栈
         this.step++;
         this.draw();
@@ -225,13 +235,17 @@ const Gobang = {
               if (this.wins[i][j][k]) {
                 // 判断每种玩家赢法上有多少子来判断权重
                 if (this.playerWins[k].number === 1) {
-                  playScore[i][j] += 200;
+                  playScore[i][j] += 100;
                 }
                 if (this.playerWins[k].number === 2) {
-                  playScore[i][j] += 400;
+                  if (this.checkWins(this.playerWins[k], false)) {
+                    playScore[i][j] += 200;
+                  } else {
+                    playScore[i][j] += 1000;
+                  }
                 }
                 if (this.playerWins[k].number === 3) {
-                  if (this.checkWins(this.playerWins[k])) { // 检测3个子中是否已经被其他子侵占
+                  if (this.checkWins(this.playerWins[k], false)) { // 检测3个子中是否已经被其他子侵占
                     playScore[i][j] += 400;
                   } else {
                     playScore[i][j] += 1000000;
@@ -242,21 +256,25 @@ const Gobang = {
                 }
                 // 判断每种电脑赢法上有多少子来判断权重（进攻优于防守）
                 if (this.pcWins[k].number === 1) {
-                  if (this.pcWins[k].position === 3 || this.pcWins[k].position === 4) {
-                    pcScore[i][j] += 260;
+                  if (this.checkWins(this.pcWins[k], true)) {
+                    pcScore[i][j] += 100;
                   } else {
-                    pcScore[i][j] += 220;
+                    if (this.pcWins[k].position === 3 || this.pcWins[k].position === 4) {
+                      pcScore[i][j] += 260;
+                    } else {
+                      pcScore[i][j] += 220;
+                    }
                   }
                 }
                 if (this.pcWins[k].number === 2) {
-                  if (this.checkWins(this.pcWins[k])) {
+                  if (this.checkWins(this.pcWins[k], true)) {
                     pcScore[i][j] += 220;
                   } else {
                     pcScore[i][j] += 10000;
                   }
                 }
                 if (this.pcWins[k].number === 3) {
-                  if (this.checkWins(this.pcWins[k])) {
+                  if (this.checkWins(this.pcWins[k], true)) {
                     pcScore[i][j] += 100000;
                   } else {
                     pcScore[i][j] += 10000000;
@@ -267,28 +285,6 @@ const Gobang = {
                 }
               }
             }
-            // 判断每步玩家的权重分，记录最大的权重分
-            // if (playScore[i][j] > max) {
-            //   max = playScore[i][j];
-            //   u = i;
-            //   v = j;
-            // } else if (playScore[i][j] == max) { // 如果权重相同，判断电脑的权重分
-            //   if (pcScore[i][j] > pcScore[u][v]) {
-            //     u = i;
-            //     v = j;
-            //   }
-            // }
-            // // 判断每步电脑的权重分，记录最大的权重分
-            // if (pcScore[i][j] > max) {
-            //   max = pcScore[i][j];
-            //   u = i;
-            //   v = j;
-            // } else if (pcScore[i][j] == max) { // 如果权重相同，判断玩家的权重分
-            //   if (playScore[i][j] > playScore[u][v]) {
-            //     u = i;
-            //     v = j;
-            //   }
-            // }
             if (playScore[i][j] + pcScore[i][j] > max) {
               max = playScore[i][j] + pcScore[i][j];
               u = i;
@@ -302,10 +298,14 @@ const Gobang = {
       u = i;
       v = j;
     }
-    
-
+    for (let i = 0; i < 15; i++) {
+      for (let j = 0; j < 15; j++) {
+        this.board[i][j].active = false;
+      }
+    }
     // 最终遍历出权重最高的 u,v 点
-    this.board[u][v].piece = this.isFirst ? '#F5F5F5' : '#000';
+    this.board[u][v].active = true; // 最新一步
+    this.board[u][v].piece = this.isFirst ? WHITE : BLACK;
     this.draw();
     this.pcStack.push(`${u},${v}`);
     for (let k = 0; k < this.count; k++) {
@@ -322,7 +322,7 @@ const Gobang = {
       this.isPlay = true;
     }
   },
-  checkWins(win) { // 检查某个赢法是否被堵死
+  checkWins(win, me) { // 检查某个赢法是否被堵死
     const first = win.steps[0]; // 第一子
     const firstX = Number(first.split(',')[0]);
     const firstY = Number(first.split(',')[1]);
@@ -331,7 +331,7 @@ const Gobang = {
     const lastX = Number(last.split(',')[0]);
     const lastY = Number(last.split(',')[1]);
     const isLastSeize = this.board[lastX][lastY].piece ? true : false;
-    const piece = this.isFirst ? '#F5F5F5' : '#000';
+    const piece = this.isFirst ? (me ? BLACK : WHITE) : (me ? WHITE : BLACK);
     if (win.position === 1) { // 横线
       if (firstX - 1 < 0) { // 出界
         return false;
