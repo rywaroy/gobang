@@ -5,7 +5,7 @@ const Gobang = {
   cx: null, // canvas 位置
   cy: null, // canvas 位置
   board: [], // 棋盘列表
-  isFirst: false, // 是否先手
+  isFirst: true, // 是否先手
   playStack: [], // 玩家下棋栈
   pcStack: [], // 电脑下棋栈
   step: 0, // 步数
@@ -39,8 +39,10 @@ const Gobang = {
     if (!this.isFirst) {
       this.step++;
       this.board[7][7].piece = '#000';
+      this.pcPlaying(7, 7);
+    } else {
+      this.draw();
     }
-    this.draw();
   },
   getWins() { // 获取所有赢法
     const wins = [];
@@ -199,93 +201,108 @@ const Gobang = {
     });
     document.getElementById('regret').addEventListener('click', this.regret.bind(this));
   },
-  pcPlaying() { // 电脑回合
+  pcPlaying(i, j) { // 电脑回合
     this.step++;
     const playScore = [];
     const pcScore = [];
     let max = 0;
     let u = 0;
     let v = 0;
-    for (let i = 0; i < 15; i++) {
-      playScore[i] = [];
-      pcScore[i] = [];
-      for (let j = 0; j < 15; j++) {
-        playScore[i][j] = 0;
-        pcScore[i][j] = 0;
-      }
-    }
-    for (let i = 0; i < 15; i++) {
-      for (let j = 0; j < 15; j++) {
-        // 遍历搜索棋盘上每个空位，查询每个空位的赢法
-        if (!this.board[i][j].piece) {
-          for (var k = 0; k < this.count; k++) {
-            if (this.wins[i][j][k]) {
-              // 判断每种玩家赢法上有多少子来判断权重
-              if (this.playerWins[k].number === 1) {
-                playScore[i][j] += 200;
-              }
-              if (this.playerWins[k].number === 2) {
-                playScore[i][j] += 400;
-              }
-              if (this.playerWins[k].number === 3) {
-                if (this.checkWins(this.playerWins[k])) { // 检测3个子中是否已经被其他子侵占
-                  playScore[i][j] += 400;
-                } else {
-                  playScore[i][j] += 1000000;
-                }
-              }
-              if (this.playerWins[k].number === 4) {
-                playScore[i][j] += 100000000;
-              }
-              // 判断每种电脑赢法上有多少子来判断权重（进攻优于防守）
-              if (this.pcWins[k].number === 1) {
-                pcScore[i][j] += 220;
-              }
-              if (this.pcWins[k].number === 2) {
-                if (this.checkWins(this.pcWins[k])) {
-                  pcScore[i][j] += 220;
-                } else {
-                  pcScore[i][j] += 10000;
-                }
-              }
-              if (this.pcWins[k].number === 3) {
-                if (this.checkWins(this.pcWins[k])) {
-                  pcScore[i][j] += 100000;
-                } else {
-                  pcScore[i][j] += 10000000;
-                }
-              }
-              if (this.pcWins[k].number === 4) {
-                pcScore[i][j] += 1000000000;
-              }
-            }
-          }
-          // 判断每步玩家的权重分，记录最大的权重分
-          if (playScore[i][j] > max) {
-            max = playScore[i][j];
-            u = i;
-            v = j;
-          } else if (playScore[i][j] == max) { // 如果权重相同，判断电脑的权重分
-            if (pcScore[i][j] > pcScore[u][v]) {
-              u = i;
-              v = j;
-            }
-          }
-          // 判断每步电脑的权重分，记录最大的权重分
-          if (pcScore[i][j] > max) {
-            max = pcScore[i][j];
-            u = i;
-            v = j;
-          } else if (pcScore[i][j] == max) { // 如果权重相同，判断玩家的权重分
-            if (playScore[i][j] > playScore[u][v]) {
-              u = i;
-              v = j;
-            }
-          }
-
+    if (j === undefined && j === undefined) {
+      for (let i = 0; i < 15; i++) {
+        playScore[i] = [];
+        pcScore[i] = [];
+        for (let j = 0; j < 15; j++) {
+          playScore[i][j] = 0;
+          pcScore[i][j] = 0;
         }
       }
+      for (let i = 0; i < 15; i++) {
+        for (let j = 0; j < 15; j++) {
+          // 遍历搜索棋盘上每个空位，查询每个空位的赢法
+          if (!this.board[i][j].piece) {
+            for (var k = 0; k < this.count; k++) {
+              if (this.wins[i][j][k]) {
+                // 判断每种玩家赢法上有多少子来判断权重
+                if (this.playerWins[k].number === 1) {
+                  playScore[i][j] += 200;
+                }
+                if (this.playerWins[k].number === 2) {
+                  playScore[i][j] += 400;
+                }
+                if (this.playerWins[k].number === 3) {
+                  if (this.checkWins(this.playerWins[k])) { // 检测3个子中是否已经被其他子侵占
+                    playScore[i][j] += 400;
+                  } else {
+                    playScore[i][j] += 1000000;
+                  }
+                }
+                if (this.playerWins[k].number === 4) {
+                  playScore[i][j] += 100000000;
+                }
+                // 判断每种电脑赢法上有多少子来判断权重（进攻优于防守）
+                if (this.pcWins[k].number === 1) {
+                  if (this.pcWins[k].position === 3 || this.pcWins[k].position === 4) {
+                    pcScore[i][j] += 260;
+                  } else {
+                    pcScore[i][j] += 220;
+                  }
+                }
+                if (this.pcWins[k].number === 2) {
+                  if (this.checkWins(this.pcWins[k])) {
+                    pcScore[i][j] += 220;
+                  } else {
+                    pcScore[i][j] += 10000;
+                  }
+                }
+                if (this.pcWins[k].number === 3) {
+                  if (this.checkWins(this.pcWins[k])) {
+                    pcScore[i][j] += 100000;
+                  } else {
+                    pcScore[i][j] += 10000000;
+                  }
+                }
+                if (this.pcWins[k].number === 4) {
+                  pcScore[i][j] += 1000000000;
+                }
+              }
+            }
+            // 判断每步玩家的权重分，记录最大的权重分
+            // if (playScore[i][j] > max) {
+            //   max = playScore[i][j];
+            //   u = i;
+            //   v = j;
+            // } else if (playScore[i][j] == max) { // 如果权重相同，判断电脑的权重分
+            //   if (pcScore[i][j] > pcScore[u][v]) {
+            //     u = i;
+            //     v = j;
+            //   }
+            // }
+            // // 判断每步电脑的权重分，记录最大的权重分
+            // if (pcScore[i][j] > max) {
+            //   max = pcScore[i][j];
+            //   u = i;
+            //   v = j;
+            // } else if (pcScore[i][j] == max) { // 如果权重相同，判断玩家的权重分
+            //   if (playScore[i][j] > playScore[u][v]) {
+            //     u = i;
+            //     v = j;
+            //   }
+            // }
+            if (playScore[i][j] + pcScore[i][j] > max) {
+              max = playScore[i][j] + pcScore[i][j];
+              u = i;
+              v = j;
+            }
+  
+          }
+        }
+      }
+    } else {
+      u = i;
+      v = j;
     }
+    
 
     // 最终遍历出权重最高的 u,v 点
     this.board[u][v].piece = this.isFirst ? '#F5F5F5' : '#000';
@@ -309,9 +326,11 @@ const Gobang = {
     const first = win.steps[0]; // 第一子
     const firstX = Number(first.split(',')[0]);
     const firstY = Number(first.split(',')[1]);
+    const isFirstSeize = this.board[firstX][firstY].piece ? true : false;
     const last = win.steps[4]; // 最后一子
     const lastX = Number(last.split(',')[0]);
     const lastY = Number(last.split(',')[1]);
+    const isLastSeize = this.board[lastX][lastY].piece ? true : false;
     const piece = this.isFirst ? '#F5F5F5' : '#000';
     if (win.position === 1) { // 横线
       if (firstX - 1 < 0) { // 出界
@@ -320,7 +339,7 @@ const Gobang = {
       if (lastX + 1 > 14) { // 出界
         return false;
       }
-      if (this.board[firstX - 1][firstY].piece === piece || this.board[lastX + 1][lastY].piece === piece) {
+      if (((this.board[firstX - 1][firstY].piece === piece) && isFirstSeize) || ((this.board[lastX + 1][lastY].piece === piece) && isLastSeize)) {
         return true;
       }
     }
@@ -331,7 +350,7 @@ const Gobang = {
       if (lastY + 1 > 14) { // 出界
         return false;
       }
-      if (this.board[firstX][firstY - 1].piece === piece || this.board[lastX][lastY + 1].piece === piece) {
+      if (((this.board[firstX][firstY - 1].piece === piece) && isFirstSeize) || ((this.board[lastX][lastY + 1].piece === piece) && isLastSeize)) {
         return true;
       }
     }
@@ -342,7 +361,7 @@ const Gobang = {
       if ((lastX + 1 > 14) || (lastY + 1 > 14)) { // 出界
         return false;
       }
-      if (this.board[firstX - 1][firstY - 1].piece === piece || this.board[lastX + 1][lastY + 1].piece === piece) {
+      if (((this.board[firstX - 1][firstY - 1].piece === piece) && isFirstSeize) || ((this.board[lastX + 1][lastY + 1].piece === piece) && isLastSeize)) {
         return true;
       }
     }
@@ -353,7 +372,7 @@ const Gobang = {
       if ((lastX + 1 > 14) || (lastY - 1 < 0)) { // 出界
         return false;
       }
-      if (this.board[firstX - 1][firstY + 1].piece === piece || this.board[lastX + 1][lastY - 1].piece === piece) {
+      if (((this.board[firstX - 1][firstY + 1].piece === piece) && isFirstSeize) || ((this.board[lastX + 1][lastY - 1].piece === piece) && isLastSeize)) {
         return true;
       }
     }
