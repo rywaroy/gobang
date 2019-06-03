@@ -259,7 +259,7 @@ const Gobang = {
                   if (this.checkWins(this.pcWins[k], true)) {
                     pcScore[i][j] += 100;
                   } else {
-                    if (this.pcWins[k].position === 3 || this.pcWins[k].position === 4) {
+                    if (this.pcWins[k].position === 3 || this.pcWins[k].position === 4) { // 斜线权重大于直线
                       pcScore[i][j] += 260;
                     } else {
                       pcScore[i][j] += 220;
