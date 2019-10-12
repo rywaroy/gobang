@@ -1,6 +1,7 @@
 const WHITE = '#F5F5F5';
 const BLACK = "#000";
 
+
 const Gobang = {
   canvas: null,
   ctx: null,
